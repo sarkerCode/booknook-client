@@ -13,6 +13,9 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useState } from "react";
+import { useSession } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
+import { toast } from "@/components/ui/toast";
 
 const initialForm = {
   bookTitle: "",
@@ -32,6 +35,8 @@ const categories = [
 
 export default function AddBookPage() {
   const [form, setForm] = useState(initialForm);
+  const { data: session } = useSession();
+  const router = useRouter();
 
   const update = (field: keyof typeof form, value: string) =>
     setForm((current) => ({ ...current, [field]: value }));
@@ -39,16 +44,40 @@ export default function AddBookPage() {
   const handleBookSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/add-book`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(form),
-    });
+    try {
+      const payload = {
+        ...form,
+        userName: session?.user?.name || "Anonymous",
+        userEmail: session?.user?.email,
+        addedBy: session?.user?.name
+          ? {
+              name: session.user.name,
+              email: session.user.email,
+            }
+          : session?.user?.email || "Anonymous",
+      };
 
-    const result = await res.json();
-    console.log(result);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/add-book`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await res.json();
+      console.log(result);
+
+      if (res.ok) {
+        toast.success("Book added successfully!");
+        router.push("/books");
+      } else {
+        toast.error("Failed to add book.");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to add book. Please try again.");
+    }
   };
 
   return (

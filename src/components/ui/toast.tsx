@@ -7,7 +7,38 @@ import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { XIcon, CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
-const toast = ToastPrimitive.createToastManager()
+const baseToastManager = ToastPrimitive.createToastManager()
+const originalAdd = baseToastManager.add.bind(baseToastManager)
+
+type ToastInput =
+  | string
+  | (Parameters<typeof originalAdd>[0] & {
+      title?: React.ReactNode
+      description?: React.ReactNode
+      type?: "success" | "error" | "warning" | "info" | "loading" | string
+    })
+
+const toast = Object.assign(baseToastManager, {
+  add: (input: ToastInput) => {
+    if (typeof input === "string") {
+      const isSuccess = /success|added|saved|confirmed/i.test(input)
+      const isError = /fail|error|wrong|unable/i.test(input)
+      return originalAdd({
+        title: input,
+        type: isSuccess ? "success" : isError ? "error" : "info",
+      })
+    }
+    return originalAdd(input)
+  },
+  success: (title: React.ReactNode, description?: React.ReactNode) =>
+    originalAdd({ title, description, type: "success" }),
+  error: (title: React.ReactNode, description?: React.ReactNode) =>
+    originalAdd({ title, description, type: "error" }),
+  info: (title: React.ReactNode, description?: React.ReactNode) =>
+    originalAdd({ title, description, type: "info" }),
+  warning: (title: React.ReactNode, description?: React.ReactNode) =>
+    originalAdd({ title, description, type: "warning" }),
+})
 
 function ToastProvider({ ...props }: ToastPrimitive.Provider.Props) {
   return <ToastPrimitive.Provider {...props} />
