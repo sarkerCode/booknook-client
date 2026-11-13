@@ -16,7 +16,9 @@ import {
   ShieldCheck,
   Library,
   CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Breadcrumb,
@@ -216,7 +218,8 @@ async function BookDetailsContent({ params }: BookDetailsPageProps) {
     session?.user?.email ||
     null;
 
-  const totalCopies = data.totalCopies || "1";
+  const copiesCount = Math.max(0, Number(data.totalCopies) || 0);
+  const isOutOfStock = copiesCount <= 0;
 
   return (
     <div className="min-h-screen bg-paper text-body">
@@ -310,10 +313,17 @@ async function BookDetailsContent({ params }: BookDetailsPageProps) {
                 </div>
                 <div className="rounded-xl bg-paper/50 p-2.5 border border-beige/50">
                   <span className="block text-[11px] text-slate">Catalog Status</span>
-                  <span className="font-semibold text-success flex items-center gap-1.5">
-                    <span className="size-1.5 rounded-full bg-success animate-pulse" />
-                    {totalCopies} {Number(totalCopies) === 1 ? "Copy" : "Copies"} Ready
-                  </span>
+                  {isOutOfStock ? (
+                    <span className="font-semibold text-danger flex items-center gap-1.5">
+                      <span className="size-1.5 rounded-full bg-danger" />
+                      Out of Stock
+                    </span>
+                  ) : (
+                    <span className="font-semibold text-success flex items-center gap-1.5">
+                      <span className="size-1.5 rounded-full bg-success animate-pulse" />
+                      {copiesCount} {copiesCount === 1 ? "Copy" : "Copies"} Ready
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -337,10 +347,17 @@ async function BookDetailsContent({ params }: BookDetailsPageProps) {
                   <Sparkles className="size-3 text-terracotta" />
                   {data.category}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-success/15 border border-success/30 px-3 py-0.5 text-xs font-semibold text-success">
-                  <CheckCircle2 className="size-3" />
-                  Available to Borrow
-                </span>
+                {isOutOfStock ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-danger/10 border border-danger/30 px-3 py-0.5 text-xs font-semibold text-danger">
+                    <AlertCircle className="size-3" />
+                    Out of Stock
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-success/15 border border-success/30 px-3 py-0.5 text-xs font-semibold text-success">
+                    <CheckCircle2 className="size-3" />
+                    Available to Borrow
+                  </span>
+                )}
                 <span className="text-xs text-slate ml-auto font-mono">
                   Catalog #{data._id.slice(-6).toUpperCase()}
                 </span>
@@ -375,8 +392,15 @@ async function BookDetailsContent({ params }: BookDetailsPageProps) {
                   <Layers className="size-3.5 text-sage" />
                   <span>Inventory</span>
                 </div>
-                <p className="font-semibold text-heading text-sm">
-                  {totalCopies} {Number(totalCopies) === 1 ? "Copy" : "Copies"}
+                <p
+                  className={cn(
+                    "font-semibold text-sm",
+                    isOutOfStock ? "text-danger" : "text-heading"
+                  )}
+                >
+                  {isOutOfStock
+                    ? "0 Copies (Out of Stock)"
+                    : `${copiesCount} ${copiesCount === 1 ? "Copy" : "Copies"}`}
                 </p>
               </div>
 
@@ -453,9 +477,11 @@ async function BookDetailsContent({ params }: BookDetailsPageProps) {
                 bookTitle={data.bookTitle}
                 authorName={data.authorName}
                 category={data.category}
-                totalCopies={totalCopies}
+                totalCopies={copiesCount}
+                bookImage={data.bookImage || ""}
                 isLoggedIn={!!session?.user}
                 userName={session?.user?.name || "Reader"}
+                userEmail={session?.user?.email || ""}
               />
             </div>
 

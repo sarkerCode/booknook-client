@@ -47,6 +47,7 @@ export default function AddBookPage() {
     try {
       const payload = {
         ...form,
+        totalCopies: Math.max(0, Number(form.totalCopies) || 0),
         userName: session?.user?.name || "Anonymous",
         userEmail: session?.user?.email,
         addedBy: session?.user?.name
@@ -144,10 +145,15 @@ export default function AddBookPage() {
               <FieldLabel>Total Copies</FieldLabel>
               <Input
                 type="number"
-                defaultValue="1"
+                min="0"
                 required
                 value={form.totalCopies}
-                onChange={(e) => update("totalCopies", e.target.value)}
+                onChange={(e) =>
+                  update(
+                    "totalCopies",
+                    Math.max(0, parseInt(e.target.value, 10) || 0).toString()
+                  )
+                }
               />
             </div>
           </div>

@@ -40,7 +40,7 @@ export default function BrowseCollections() {
             </p>
             <h2
               id="browse-heading"
-              className="mt-2 text-3xl font-semibold tracking-tight text-heading sm:text-4xl"
+              className="mt-2 font-display text-3xl font-semibold tracking-tight text-heading sm:text-4xl"
             >
               Browse by mood, not just title
             </h2>

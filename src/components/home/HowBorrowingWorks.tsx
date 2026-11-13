@@ -43,7 +43,7 @@ export default function HowBorrowingWorks() {
           </p>
           <h2
             id="how-heading"
-            className="mt-3 text-3xl font-semibold tracking-tight text-paper sm:text-4xl lg:text-[2.75rem]"
+            className="mt-3 font-display text-3xl font-semibold tracking-tight text-paper sm:text-4xl lg:text-[2.75rem]"
           >
             Borrow in three easy steps
           </h2>
@@ -65,7 +65,7 @@ export default function HowBorrowingWorks() {
               <p className="mt-5 text-sm font-semibold tracking-wide text-terracotta">
                 {item.step}
               </p>
-              <h3 className="mt-2 text-xl font-semibold tracking-tight text-paper">
+              <h3 className="mt-2 font-display text-xl font-semibold tracking-tight text-paper">
                 {item.title}
               </h3>
               <p className="mt-3 max-w-xs text-sm leading-relaxed text-paper/70">

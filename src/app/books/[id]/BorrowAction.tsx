@@ -1,19 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   BookOpen,
   BookmarkCheck,
   CheckCircle2,
   Clock,
   ShieldCheck,
-  ArrowRight,
   Library,
   LogIn,
   Info,
+  Layers,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { FieldLabel } from "@/components/ui/field";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { toast } from "@/components/ui/toast";
 
 interface BorrowActionProps {
   bookId: string;
@@ -29,8 +34,10 @@ interface BorrowActionProps {
   authorName: string;
   category: string;
   totalCopies?: string | number;
+  bookImage?: string;
   isLoggedIn: boolean;
   userName?: string;
+  userEmail?: string;
 }
 
 export function BorrowAction({
@@ -39,49 +46,138 @@ export function BorrowAction({
   authorName,
   category,
   totalCopies = 1,
+  bookImage = "",
   isLoggedIn,
   userName = "Reader",
+  userEmail = "",
 }: BorrowActionProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Calculate return date (14 days from today)
+  // Manage inventory state (never negative)
+  const [availableCopies, setAvailableCopies] = useState<number>(() =>
+    Math.max(0, Number(totalCopies) || 0)
+  );
+
+  useEffect(() => {
+    setAvailableCopies(Math.max(0, Number(totalCopies) || 0));
+  }, [totalCopies]);
+
+  const isOutOfStock = availableCopies <= 0;
+
+  // Calculate borrow & return dates (14-day checkout)
   const today = new Date();
   const returnDate = new Date();
   returnDate.setDate(today.getDate() + 14);
 
+  const borrowDateISO = today.toISOString().split("T")[0];
+  const returnDateISO = returnDate.toISOString().split("T")[0];
+
+  const formattedBorrowDate = today.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
   const formattedReturnDate = returnDate.toLocaleDateString("en-US", {
-    month: "long",
+    month: "short",
     day: "numeric",
     year: "numeric",
   });
 
   const handleOpenBorrow = () => {
+    if (isOutOfStock) {
+      toast.error("This book is currently out of stock.");
+      return;
+    }
     setIsConfirmed(false);
     setIsOpen(true);
   };
 
-  const handleConfirmBorrow = () => {
+  const handleConfirmBorrow = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isOutOfStock) {
+      toast.error("This book is currently out of stock.");
+      return;
+    }
+
     setIsSubmitting(true);
-    // Simulate brief network submission for responsiveness
-    setTimeout(() => {
+
+    try {
+      const borrowRecord = {
+        bookId,
+        bookTitle,
+        bookImage,
+        userEmail,
+        userName,
+        borrowDate: borrowDateISO,
+        returnDate: returnDateISO,
+      };
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/my-borrows`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(borrowRecord),
+        }
+      );
+
+      const result = await res.json().catch(() => ({}));
+
+      if (res.ok) {
+        // Decrease inventory state, never negative
+        const newCopies =
+          typeof result.remainingCopies === "number"
+            ? Math.max(0, result.remainingCopies)
+            : Math.max(0, availableCopies - 1);
+        setAvailableCopies(newCopies);
+        toast.success("Book borrowed successfully!");
+        setIsConfirmed(true);
+        router.refresh();
+      } else {
+        toast.error(result.message || "Failed to borrow book.");
+        if (
+          res.status === 400 &&
+          result.message?.toLowerCase().includes("stock")
+        ) {
+          setAvailableCopies(0);
+          setIsOpen(false);
+        }
+      }
+    } catch (err) {
+      console.error("Borrow error:", err);
+      toast.error("Failed to borrow book. Please try again.");
+    } finally {
       setIsSubmitting(false);
-      setIsConfirmed(true);
-    }, 400);
+    }
   };
 
   return (
     <div className="space-y-4">
       {/* Primary Actions Bar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-        <Button
-          onClick={handleOpenBorrow}
-          className="flex-1 h-12 bg-terracotta text-white hover:bg-terracotta-hover text-base font-medium rounded-xl shadow-[0_6px_20px_rgba(200,117,85,0.3)] transition-all cursor-pointer flex items-center justify-center gap-2.5 px-6"
-        >
-          <BookmarkCheck className="size-5" />
-          <span>Borrow This Book</span>
-        </Button>
+        {isOutOfStock ? (
+          <Button
+            disabled
+            className="flex-1 h-12 bg-slate/15 text-slate border border-beige/80 text-base font-medium rounded-xl cursor-not-allowed flex items-center justify-center gap-2.5 px-6 shadow-none"
+          >
+            <AlertCircle className="size-5 text-amber" />
+            <span>Out of Stock (0 Copies Available)</span>
+          </Button>
+        ) : (
+          <Button
+            onClick={handleOpenBorrow}
+            className="flex-1 h-12 bg-terracotta text-white hover:bg-terracotta-hover text-base font-medium rounded-xl shadow-[0_6px_20px_rgba(200,117,85,0.3)] transition-all cursor-pointer flex items-center justify-center gap-2.5 px-6"
+          >
+            <BookmarkCheck className="size-5" />
+            <span>Borrow This Book ({availableCopies} available)</span>
+          </Button>
+        )}
 
         <Link href="/books" className="flex-1 sm:flex-initial">
           <Button
@@ -94,8 +190,20 @@ export function BorrowAction({
         </Link>
       </div>
 
-      {/* Lending Policy Reassurance */}
+      {/* Lending Policy & Inventory Reassurance */}
       <div className="flex flex-wrap items-center gap-y-2 gap-x-6 text-xs text-slate pt-1">
+        <span className="inline-flex items-center gap-1.5">
+          <Layers className="size-3.5 text-sage" />
+          <span
+            className={
+              isOutOfStock ? "text-danger font-semibold" : "text-heading"
+            }
+          >
+            {isOutOfStock
+              ? "0 copies remaining"
+              : `${availableCopies} copies in stock`}
+          </span>
+        </span>
         <span className="inline-flex items-center gap-1.5">
           <Clock className="size-3.5 text-sage" />
           <span>14-day lending period</span>
@@ -106,11 +214,11 @@ export function BorrowAction({
         </span>
         <span className="inline-flex items-center gap-1.5">
           <Info className="size-3.5 text-terracotta" />
-          <span>Instant reservation & renewal</span>
+          <span>Instant reservation & return</span>
         </span>
       </div>
 
-      {/* Borrow Confirmation / Sign-in Modal */}
+      {/* Borrow Modal */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="sm:max-w-md bg-card border-beige p-6 rounded-2xl shadow-xl">
           {!isLoggedIn ? (
@@ -125,8 +233,7 @@ export function BorrowAction({
                 </DialogTitle>
                 <DialogDescription className="text-center text-slate text-sm">
                   You need a BookNook account to borrow books from our Editorial
-                  Library. It only takes a moment to join our community of
-                  readers.
+                  Library. Join our community of readers in seconds.
                 </DialogDescription>
               </DialogHeader>
 
@@ -170,11 +277,11 @@ export function BorrowAction({
                   Borrow Request Confirmed!
                 </DialogTitle>
                 <DialogDescription className="text-slate text-sm">
-                  We have reserved a copy of{" "}
+                  A copy of{" "}
                   <strong className="text-heading font-medium">
                     {bookTitle}
                   </strong>{" "}
-                  for you.
+                  has been added to your borrowed shelf.
                 </DialogDescription>
               </div>
 
@@ -184,102 +291,142 @@ export function BorrowAction({
                   <span className="font-medium text-heading">{userName}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-beige/60">
-                  <span className="text-slate">Loan Period:</span>
-                  <span className="font-medium text-heading">14 Days</span>
+                  <span className="text-slate">Borrow Date:</span>
+                  <span className="font-medium text-heading">
+                    {formattedBorrowDate}
+                  </span>
                 </div>
-                <div className="flex justify-between py-1">
+                <div className="flex justify-between py-1 border-b border-beige/60">
                   <span className="text-slate">Due Return Date:</span>
                   <span className="font-semibold text-terracotta">
                     {formattedReturnDate}
                   </span>
                 </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-slate">Remaining Stock:</span>
+                  <span className="font-medium text-heading">
+                    {availableCopies} {availableCopies === 1 ? "Copy" : "Copies"}
+                  </span>
+                </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-2 pt-2">
-                <Button
-                  onClick={() => setIsOpen(false)}
-                  className="w-full bg-ink text-white hover:bg-deep h-11 rounded-xl font-medium cursor-pointer"
-                >
-                  Close & View Details
-                </Button>
-                <Link href="/books" className="w-full">
-                  <Button
-                    variant="outline"
-                    className="w-full border-beige text-heading hover:bg-paper h-11 rounded-xl cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <span>Explore More Books</span>
-                    <ArrowRight className="size-3.5" />
+              <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+                <Link href="/my-borrows" className="w-full sm:flex-1">
+                  <Button className="w-full bg-terracotta text-white hover:bg-terracotta-hover h-11 rounded-xl font-medium cursor-pointer flex items-center justify-center gap-2">
+                    <BookOpen className="size-4" />
+                    <span>View My Borrows</span>
                   </Button>
                 </Link>
-              </div>
-            </div>
-          ) : (
-            // Confirmation Form View
-            <div className="space-y-5">
-              <DialogHeader>
-                <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-sage/20 text-sage mb-2">
-                  <BookOpen className="size-6 text-ink" />
-                </div>
-                <DialogTitle className="font-display text-2xl font-semibold text-center text-heading">
-                  Confirm Borrow Request
-                </DialogTitle>
-                <DialogDescription className="text-center text-slate text-sm">
-                  Please review your borrowing details before confirming.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="rounded-xl border border-beige bg-paper/60 p-4 space-y-2.5 text-sm">
-                <div>
-                  <span className="text-xs uppercase tracking-wider text-terracotta font-semibold">
-                    {category}
-                  </span>
-                  <h4 className="font-display text-lg font-semibold text-heading leading-snug">
-                    {bookTitle}
-                  </h4>
-                  <p className="text-xs text-slate">by {authorName}</p>
-                </div>
-
-                <div className="pt-2 border-t border-beige/60 space-y-1.5 text-xs text-slate">
-                  <div className="flex justify-between">
-                    <span>Borrower:</span>
-                    <span className="font-medium text-heading">{userName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Lending Term:</span>
-                    <span className="font-medium text-heading">14 Days (Free)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Due Date:</span>
-                    <span className="font-semibold text-terracotta">
-                      {formattedReturnDate}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Available Copies:</span>
-                    <span className="font-medium text-heading">{totalCopies}</span>
-                  </div>
-                </div>
-              </div>
-
-              <DialogFooter className="m-0 p-0 border-t-0 bg-transparent flex flex-col-reverse sm:flex-row gap-2.5 pt-2">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setIsOpen(false)}
-                  className="w-full sm:flex-1 border-beige text-slate hover:text-heading hover:bg-paper h-11 rounded-xl cursor-pointer font-medium"
+                  className="w-full sm:flex-1 border-beige text-heading hover:bg-paper h-11 rounded-xl cursor-pointer"
                 >
-                  Cancel
+                  Close
                 </Button>
-                <Button
-                  type="button"
-                  onClick={handleConfirmBorrow}
-                  disabled={isSubmitting}
-                  className="w-full sm:flex-1 bg-terracotta text-white hover:bg-terracotta-hover h-11 rounded-xl font-medium cursor-pointer flex items-center justify-center gap-2 shadow-sm"
-                >
-                  <BookmarkCheck className="size-4" />
-                  <span>{isSubmitting ? "Processing..." : "Confirm & Borrow"}</span>
-                </Button>
-              </DialogFooter>
+              </div>
+            </div>
+          ) : (
+            // Borrow Form View (Read-only User Name & Email, Confirm Borrow button)
+            <div className="space-y-4">
+              <DialogHeader>
+                <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-sage/20 text-sage mb-1">
+                  <BookOpen className="size-6 text-ink" />
+                </div>
+                <DialogTitle className="font-display text-2xl font-semibold text-center text-heading">
+                  Borrow This Book
+                </DialogTitle>
+                <DialogDescription className="text-center text-slate text-xs">
+                  Review your borrower information and confirm your 14-day checkout.
+                </DialogDescription>
+              </DialogHeader>
+
+              {/* Book Details Summary */}
+              <div className="rounded-xl border border-beige bg-paper/60 p-3.5 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-terracotta">
+                    {category}
+                  </span>
+                  <span className="text-[11px] font-medium text-slate">
+                    {availableCopies} {availableCopies === 1 ? "copy" : "copies"} left
+                  </span>
+                </div>
+                <h4 className="font-display text-base font-semibold text-heading leading-snug">
+                  {bookTitle}
+                </h4>
+                <p className="text-xs text-slate">by {authorName}</p>
+              </div>
+
+              {isOutOfStock && (
+                <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger font-medium flex items-center gap-2">
+                  <AlertCircle className="size-4 shrink-0" />
+                  <span>
+                    This book is currently out of stock and cannot be borrowed.
+                  </span>
+                </div>
+              )}
+
+              {/* Form with read-only User Name and Email */}
+              <form onSubmit={handleConfirmBorrow} className="space-y-3.5 pt-1">
+                <div className="space-y-1.5">
+                  <FieldLabel className="text-xs font-semibold text-heading">
+                    User Name
+                  </FieldLabel>
+                  <Input
+                    type="text"
+                    value={userName}
+                    readOnly
+                    className="rounded-xl border-beige bg-paper/50 text-slate cursor-not-allowed font-medium text-sm"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <FieldLabel className="text-xs font-semibold text-heading">
+                    User Email
+                  </FieldLabel>
+                  <Input
+                    type="email"
+                    value={userEmail}
+                    readOnly
+                    className="rounded-xl border-beige bg-paper/50 text-slate cursor-not-allowed font-medium text-sm"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="rounded-xl border border-beige bg-paper/40 p-2.5 text-xs">
+                    <span className="block text-[11px] text-slate">Borrow Date</span>
+                    <span className="font-semibold text-heading">
+                      {formattedBorrowDate}
+                    </span>
+                  </div>
+                  <div className="rounded-xl border border-beige bg-paper/40 p-2.5 text-xs">
+                    <span className="block text-[11px] text-slate">Return Date</span>
+                    <span className="font-semibold text-terracotta">
+                      {formattedReturnDate}
+                    </span>
+                  </div>
+                </div>
+
+                <DialogFooter className="m-0 p-0 border-t-0 bg-transparent flex flex-col-reverse sm:flex-row gap-2.5 pt-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsOpen(false)}
+                    className="w-full sm:flex-1 border-beige text-slate hover:text-heading hover:bg-paper h-11 rounded-xl cursor-pointer font-medium"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting || isOutOfStock}
+                    className="w-full sm:flex-1 bg-terracotta text-white hover:bg-terracotta-hover h-11 rounded-xl font-medium cursor-pointer flex items-center justify-center gap-2 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <BookmarkCheck className="size-4" />
+                    <span>{isSubmitting ? "Processing..." : "Confirm Borrow"}</span>
+                  </Button>
+                </DialogFooter>
+              </form>
             </div>
           )}
         </DialogContent>
