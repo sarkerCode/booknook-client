@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Search, PlusCircle, BookOpen, X, Sparkles, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BookCard } from "@/components/BookCard";
+import { BookCard } from "@/components/books/BookCard";
 
 export type ApiBook = {
   _id: string;
