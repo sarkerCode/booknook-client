@@ -1,4 +1,6 @@
+
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import Link from "next/link";
@@ -15,12 +17,18 @@ export const metadata = {
 };
 
 async function MyBooksContent() {
+  // Wait for an actual incoming request.
+  // Prevents authenticated data fetching during prerendering.
+  await connection();
+
+  // Get the current user's session.
   const session = await auth.api.getSession({
     headers: await headers(),
   });
 
   const email = session?.user?.email;
 
+  // Handle unauthenticated users.
   if (!email) {
     return (
       <div className="min-h-[80vh] bg-paper flex items-center justify-center px-4 py-16">
@@ -28,16 +36,20 @@ async function MyBooksContent() {
           <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-sage/20 text-ink">
             <BookOpen className="size-7 text-ink" />
           </div>
+
           <span className="text-[11px] font-bold tracking-[0.25em] text-terracotta uppercase">
             BookNook • Editorial Library
           </span>
+
           <h2 className="font-display text-2xl font-semibold text-heading">
             Sign In to View Your Shelf
           </h2>
+
           <p className="text-sm text-slate leading-relaxed">
-            Please sign in to access, edit, and manage the books and stories you
-            have contributed to the library.
+            Please sign in to access, edit, and manage the books and stories
+            you have contributed to the library.
           </p>
+
           <div className="pt-2 flex flex-col sm:flex-row gap-3">
             <Link href="/login" className="w-full">
               <Button className="w-full bg-ink text-white hover:bg-deep h-11 rounded-xl font-medium cursor-pointer flex items-center justify-center gap-2">
@@ -45,6 +57,7 @@ async function MyBooksContent() {
                 <span>Sign In to Continue</span>
               </Button>
             </Link>
+
             <Link href="/books" className="w-full">
               <Button
                 variant="outline"
@@ -62,9 +75,9 @@ async function MyBooksContent() {
 
   let books: Book[] = [];
 
-  const token = await getTokenFromServer();
-
   try {
+    const token = await getTokenFromServer();
+
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/my-books/${encodeURIComponent(email)}`,
       {
@@ -75,11 +88,17 @@ async function MyBooksContent() {
       }
     );
 
-    if (response.ok) {
+    if (!response.ok) {
+      console.error(
+        "Failed to fetch user books:",
+        response.status,
+        response.statusText
+      );
+    } else {
       books = (await response.json()) as Book[];
     }
-  } catch (err) {
-    console.error("Failed to fetch user books:", err);
+  } catch (error) {
+    console.error("Failed to fetch user books:", error);
   }
 
   return <MyBooksClient initialBooks={books} userEmail={email} />;
