@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BookOpen, LogIn, Library } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MyBooksClient, type Book } from "./MyBooksClient";
+import { getTokenFromServer } from "@/lib/getTokenFromServer";
 
 export const metadata = {
   title: "My Added Books | BookNook Editorial Library",
@@ -85,11 +86,17 @@ async function MyBooksContent() {
   }
 
   let books: Book[] = [];
+
+  const token = await getTokenFromServer();
+
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/my-books/${encodeURIComponent(email)}`,
       {
         cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       }
     );
 

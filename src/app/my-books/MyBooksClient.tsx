@@ -47,6 +47,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
+import { getTokenFromClient } from "@/lib/getTokenFromClient";
 
 export type Book = {
   _id: string;
@@ -133,6 +134,8 @@ export function MyBooksClient({ initialBooks, userEmail }: MyBooksClientProps) {
     if (!editingBook) return;
 
     setIsSavingEdit(true);
+
+    const token = await getTokenFromClient();
     try {
       const payload = {
         bookTitle: editForm.bookTitle.trim(),
@@ -149,6 +152,7 @@ export function MyBooksClient({ initialBooks, userEmail }: MyBooksClientProps) {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
+            authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(payload),
         }
@@ -185,11 +189,15 @@ export function MyBooksClient({ initialBooks, userEmail }: MyBooksClientProps) {
     if (!deletingBook) return;
 
     setIsDeleting(true);
+    const token = await getTokenFromClient();
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/my-books/${deletingBook._id}`,
         {
           method: "DELETE",
+          headers: {
+            authorization: `Bearer ${token}`,
+          },
         }
       );
 

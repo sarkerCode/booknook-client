@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BookOpen, LogIn, Library } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MyBorrowsClient, type BorrowRecord } from "./MyBorrowsClient";
+import { getTokenFromServer } from "@/lib/getTokenFromServer";
 
 export const metadata = {
   title: "My Borrowed Books | BookNook Editorial Library",
@@ -85,11 +86,17 @@ async function MyBorrowsContent() {
   }
 
   let borrows: BorrowRecord[] = [];
+
+  const token = await getTokenFromServer();
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/my-borrows/${encodeURIComponent(email)}`,
       {
         cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
       }
     );
 

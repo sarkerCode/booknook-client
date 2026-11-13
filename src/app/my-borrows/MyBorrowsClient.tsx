@@ -13,7 +13,6 @@ import {
   Search,
   ExternalLink,
   Library,
-  AlertCircle,
   X,
   CheckCircle2,
 } from "lucide-react";
@@ -35,6 +34,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toast";
+import { getTokenFromClient } from "@/lib/getTokenFromClient";
 
 export type BorrowRecord = {
   _id: string;
@@ -84,11 +84,16 @@ export function MyBorrowsClient({
     if (!returningRecord) return;
 
     setIsSubmittingReturn(true);
+    const token = await getTokenFromClient();
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/my-borrows/${returningRecord._id}`,
         {
           method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
 

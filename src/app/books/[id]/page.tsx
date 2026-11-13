@@ -55,6 +55,8 @@ export async function generateMetadata({
   params,
 }: BookDetailsPageProps): Promise<Metadata> {
   const { id } = await params;
+
+  
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/book/${id}`, {
       cache: "no-store",

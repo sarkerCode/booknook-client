@@ -23,6 +23,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/lib/auth-client";
 import { toast } from "@/components/ui/toast";
+import { getTokenFromClient } from "@/lib/getTokenFromClient";
 
 const initialForm = {
   bookTitle: "",
@@ -53,6 +54,10 @@ export default function AddBookPage() {
     event.preventDefault();
     setIsSubmitting(true);
 
+    const token = await getTokenFromClient();
+    console.log("Token from client:", token);
+
+
     try {
       const payload = {
         ...form,
@@ -71,6 +76,7 @@ export default function AddBookPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });
