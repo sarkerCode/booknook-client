@@ -38,6 +38,7 @@ interface BorrowActionProps {
   isLoggedIn: boolean;
   userName?: string;
   userEmail?: string;
+  alreadyBorrowed?: boolean;
 }
 
 export function BorrowAction({
@@ -50,6 +51,7 @@ export function BorrowAction({
   isLoggedIn,
   userName = "Reader",
   userEmail = "",
+  alreadyBorrowed = false,
 }: BorrowActionProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -61,9 +63,16 @@ export function BorrowAction({
     Math.max(0, Number(totalCopies) || 0)
   );
 
+  // Track double-borrow state
+  const [isAlreadyBorrowed, setIsAlreadyBorrowed] = useState(Boolean(alreadyBorrowed));
+
   useEffect(() => {
     setAvailableCopies(Math.max(0, Number(totalCopies) || 0));
   }, [totalCopies]);
+
+  useEffect(() => {
+    setIsAlreadyBorrowed(Boolean(alreadyBorrowed));
+  }, [alreadyBorrowed]);
 
   const isOutOfStock = availableCopies <= 0;
 
@@ -89,9 +98,18 @@ export function BorrowAction({
 
   const handleOpenBorrow = () => {
     if (isOutOfStock) {
-      toast.error("This book is currently out of stock.");
+      toast.error("This book is not available.");
       return;
     }
+
+    // No Double Borrow Check
+    if (isAlreadyBorrowed) {
+      toast.error(
+        "You cannot borrow the same book two times at the same time."
+      );
+      return;
+    }
+
     setIsConfirmed(false);
     setIsOpen(true);
   };
@@ -99,7 +117,15 @@ export function BorrowAction({
   const handleConfirmBorrow = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isOutOfStock) {
-      toast.error("This book is currently out of stock.");
+      toast.error("This book is not available.");
+      return;
+    }
+
+    // No Double Borrow Check
+    if (isAlreadyBorrowed) {
+      toast.error(
+        "You cannot borrow the same book two times at the same time."
+      );
       return;
     }
 
@@ -130,20 +156,33 @@ export function BorrowAction({
       const result = await res.json().catch(() => ({}));
 
       if (res.ok) {
-        // Decrease inventory state, never negative
+        // Decrease inventory state (decreased by 1 with $inc on server)
         const newCopies =
           typeof result.remainingCopies === "number"
             ? Math.max(0, result.remainingCopies)
             : Math.max(0, availableCopies - 1);
         setAvailableCopies(newCopies);
+        setIsAlreadyBorrowed(true);
         toast.success("Book borrowed successfully!");
         setIsConfirmed(true);
         router.refresh();
       } else {
-        toast.error(result.message || "Failed to borrow book.");
+        toast.error(
+          result.message ||
+            "You cannot borrow the same book two times at the same time."
+        );
+        if (
+          result.message?.toLowerCase().includes("already borrowed") ||
+          result.message?.toLowerCase().includes("twice") ||
+          result.message?.toLowerCase().includes("two times")
+        ) {
+          setIsAlreadyBorrowed(true);
+          setIsOpen(false);
+        }
         if (
           res.status === 400 &&
-          result.message?.toLowerCase().includes("stock")
+          (result.message?.toLowerCase().includes("available") ||
+            result.message?.toLowerCase().includes("stock"))
         ) {
           setAvailableCopies(0);
           setIsOpen(false);
@@ -161,13 +200,27 @@ export function BorrowAction({
     <div className="space-y-4">
       {/* Primary Actions Bar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        {/* If copies are 0: disable the Borrow button and show "Not Available" */}
         {isOutOfStock ? (
           <Button
             disabled
-            className="flex-1 h-12 bg-slate/15 text-slate border border-beige/80 text-base font-medium rounded-xl cursor-not-allowed flex items-center justify-center gap-2.5 px-6 shadow-none"
+            className="flex-1 h-12 bg-slate/15 text-slate border border-beige/80 text-base font-medium rounded-xl cursor-not-allowed flex items-center justify-center gap-2 px-6 shadow-none"
           >
             <AlertCircle className="size-5 text-amber" />
-            <span>Out of Stock (0 Copies Available)</span>
+            <span>Not Available</span>
+          </Button>
+        ) : isAlreadyBorrowed ? (
+          <Button
+            type="button"
+            onClick={() => {
+              toast.error(
+                "You cannot borrow the same book two times at the same time."
+              );
+            }}
+            className="flex-1 h-12 bg-sage/20 text-heading border border-sage/50 hover:bg-sage/30 text-base font-medium rounded-xl cursor-pointer flex items-center justify-center gap-2 px-6 shadow-none transition-colors"
+          >
+            <BookmarkCheck className="size-5 text-sage" />
+            <span>Already Borrowed</span>
           </Button>
         ) : (
           <Button
@@ -200,7 +253,7 @@ export function BorrowAction({
             }
           >
             {isOutOfStock
-              ? "0 copies remaining"
+              ? "0 copies remaining (Not Available)"
               : `${availableCopies} copies in stock`}
           </span>
         </span>
@@ -214,7 +267,7 @@ export function BorrowAction({
         </span>
         <span className="inline-flex items-center gap-1.5">
           <Info className="size-3.5 text-terracotta" />
-          <span>Instant reservation & return</span>
+          <span>Single loan per title</span>
         </span>
       </div>
 
@@ -362,7 +415,7 @@ export function BorrowAction({
                 <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger font-medium flex items-center gap-2">
                   <AlertCircle className="size-4 shrink-0" />
                   <span>
-                    This book is currently out of stock and cannot be borrowed.
+                    This book is currently not available and cannot be borrowed.
                   </span>
                 </div>
               )}
@@ -419,7 +472,7 @@ export function BorrowAction({
                   </Button>
                   <Button
                     type="submit"
-                    disabled={isSubmitting || isOutOfStock}
+                    disabled={isSubmitting || isOutOfStock || isAlreadyBorrowed}
                     className="w-full sm:flex-1 bg-terracotta text-white hover:bg-terracotta-hover h-11 rounded-xl font-medium cursor-pointer flex items-center justify-center gap-2 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <BookmarkCheck className="size-4" />

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { connection } from "next/server";
 import { ArrowRight, BookOpen, Bookmark, Library, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -54,6 +55,8 @@ export function NewArrivalsSkeleton() {
 }
 
 export default async function NewArrivals() {
+  await connection();
+
   let books: BookArrival[] = [];
 
   try {
@@ -68,15 +71,6 @@ export default async function NewArrivals() {
       books = (await res.json()) as BookArrival[];
     }
   } catch (err: unknown) {
-    if (
-      typeof err === "object" &&
-      err !== null &&
-      "digest" in err &&
-      typeof (err as { digest: string }).digest === "string" &&
-      (err as { digest: string }).digest.startsWith("HANGING_PROMISE")
-    ) {
-      throw err;
-    }
     console.error("Failed to load new arrivals:", err);
   }
 

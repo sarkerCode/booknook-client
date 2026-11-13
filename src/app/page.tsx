@@ -6,7 +6,7 @@ import BrowseCollections from "@/components/home/BrowseCollections";
 import HowBorrowingWorks from "@/components/home/HowBorrowingWorks";
 
 export const metadata: Metadata = {
-  title: "BookNook | Editorial Library & Book Borrowing",
+  title: "BookNook | All Books & Editorial Library",
   description:
     "A quiet place for curious minds and beautiful stories. Discover new arrivals, explore curated literature collections, and borrow books freely from our community library.",
   openGraph: {

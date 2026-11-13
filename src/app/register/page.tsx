@@ -45,6 +45,7 @@ export default function RegisterPage() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [touched, setTouched] = useState(false);
 
   // Password requirement checks
@@ -121,6 +122,30 @@ export default function RegisterPage() {
     }
   };
 
+  const handleGoogleRegister = async () => {
+    try {
+      setIsGoogleSubmitting(true);
+      setServerError(null);
+      const { error } = await authClient.signIn.social({
+        provider: "google",
+        callbackURL: "/",
+      });
+
+      if (error) {
+        const errorMsg = error.message || "Google registration failed.";
+        setServerError(errorMsg);
+        toast.error(errorMsg);
+        setIsGoogleSubmitting(false);
+      }
+    } catch (err: unknown) {
+      console.error("Google sign up error:", err);
+      const errorMsg = "An unexpected error occurred during Google registration.";
+      setServerError(errorMsg);
+      toast.error(errorMsg);
+      setIsGoogleSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-[85vh] bg-paper flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-4">
@@ -168,10 +193,9 @@ export default function RegisterPage() {
                   <Button
                     variant="outline"
                     type="button"
-                    onClick={() =>
-                      authClient.signIn.social({ provider: "google" })
-                    }
-                    className="w-full h-11 border-beige bg-card text-heading hover:bg-paper hover:text-ink hover:border-ink/30 rounded-xl cursor-pointer flex items-center justify-center gap-2 font-medium"
+                    disabled={isGoogleSubmitting || isSubmitting}
+                    onClick={handleGoogleRegister}
+                    className="w-full h-11 border-beige bg-card text-heading hover:bg-paper hover:text-ink hover:border-ink/30 rounded-xl cursor-pointer flex items-center justify-center gap-2 font-medium disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -183,7 +207,7 @@ export default function RegisterPage() {
                         fill="currentColor"
                       />
                     </svg>
-                    <span>Sign up with Google</span>
+                    <span>{isGoogleSubmitting ? "Connecting to Google..." : "Sign up with Google"}</span>
                   </Button>
                 </Field>
 

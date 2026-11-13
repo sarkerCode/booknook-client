@@ -221,6 +221,23 @@ async function BookDetailsContent({ params }: BookDetailsPageProps) {
   const copiesCount = Math.max(0, Number(data.totalCopies) || 0);
   const isOutOfStock = copiesCount <= 0;
 
+  // Check if current user already borrowed this book (No Double Borrow)
+  let alreadyBorrowed = false;
+  if (session?.user?.email) {
+    try {
+      const borrowsRes = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/my-borrows/${encodeURIComponent(session.user.email)}`,
+        { cache: "no-store" }
+      );
+      if (borrowsRes.ok) {
+        const userBorrows = (await borrowsRes.json()) as Array<{ bookId?: string }>;
+        alreadyBorrowed = userBorrows.some((b) => b.bookId === id);
+      }
+    } catch (err) {
+      console.error("Check active borrows error:", err);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-paper text-body">
       {/* Editorial Navigation Top Bar */}
@@ -316,7 +333,7 @@ async function BookDetailsContent({ params }: BookDetailsPageProps) {
                   {isOutOfStock ? (
                     <span className="font-semibold text-danger flex items-center gap-1.5">
                       <span className="size-1.5 rounded-full bg-danger" />
-                      Out of Stock
+                      Not Available
                     </span>
                   ) : (
                     <span className="font-semibold text-success flex items-center gap-1.5">
@@ -350,7 +367,7 @@ async function BookDetailsContent({ params }: BookDetailsPageProps) {
                 {isOutOfStock ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-danger/10 border border-danger/30 px-3 py-0.5 text-xs font-semibold text-danger">
                     <AlertCircle className="size-3" />
-                    Out of Stock
+                    Not Available
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 rounded-full bg-success/15 border border-success/30 px-3 py-0.5 text-xs font-semibold text-success">
@@ -399,7 +416,7 @@ async function BookDetailsContent({ params }: BookDetailsPageProps) {
                   )}
                 >
                   {isOutOfStock
-                    ? "0 Copies (Out of Stock)"
+                    ? "0 Copies (Not Available)"
                     : `${copiesCount} ${copiesCount === 1 ? "Copy" : "Copies"}`}
                 </p>
               </div>
@@ -482,6 +499,7 @@ async function BookDetailsContent({ params }: BookDetailsPageProps) {
                 isLoggedIn={!!session?.user}
                 userName={session?.user?.name || "Reader"}
                 userEmail={session?.user?.email || ""}
+                alreadyBorrowed={alreadyBorrowed}
               />
             </div>
 
